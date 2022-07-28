@@ -16,6 +16,7 @@
     You should have received a copy of the GNU General Public License
     along with this library.  If not, see <http://www.gnu.org/licenses/>.
 -}
+{-# OPTIONS_GHC -Wno-incomplete-patterns #-}
 
 module Sound.Tidal.Sequence where
 
@@ -58,10 +59,44 @@ seqSpan (Sequence bs) = sum $ map seqSpan bs
 seqSpan (Stack _ []) = 0
 seqSpan (Stack RepeatLCM [b]) = seqSpan b
 seqSpan (Stack RepeatLCM (b:bs)) = foldr lcmRational (seqSpan b) $ map seqSpan bs
+-- Doesn't this not consider b  acutally?  Instead be map seqSpan (b:bs)
 seqSpan (Stack TruncateMin (b:bs)) = minimum $ map seqSpan bs
 seqSpan (Stack _ bs) = maximum $ map seqSpan bs
 
+lcmRational :: Rational->Rational-> Rational
 lcmRational a b = (lcm (f a) (f b)) % d
   where d = lcm (denominator a) (denominator b)
         f x = numerator x * (d `div` denominator x)
-        
+
+stratApply::Strategy -> [Sequence a] ->Sequence a
+stratApply JustifyLeft bs =
+  let a = maximum $ map seqSpan bs
+      b = map (\x -> Sequence (x: [Silence (a - seqSpan x)])) bs
+  in Stack JustifyLeft b
+
+stratApply JustifyRight bs =
+  let a = maximum $ map seqSpan bs
+      b = map (\x -> Sequence (Silence (a - seqSpan x) : [x])) bs
+  in Stack JustifyRight b
+
+stratApply Centre bs =
+  let a = maximum $ map seqSpan bs
+      b = map( \x -> Sequence ([Silence ((a - seqSpan x)/2)] ++ [x] ++ [Silence ((a - seqSpan x)/2)])) bs
+  in Stack Centre b
+
+
+
+--RepeatLCM
+stratApply RepeatLCM bs@(x:xs) =
+  let a = foldr lcmRational (seqSpan x) $ map seqSpan xs
+      b = map (\x ->  Sequence $ replicate (fromIntegral $ numerator $ a/seqSpan x) x) bs
+  in Stack RepeatLCM b 
+
+
+--JusttifyBoth
+
+--Expand
+
+--TruncateMax
+
+--TruncateMin
